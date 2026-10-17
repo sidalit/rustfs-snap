@@ -1,0 +1,116 @@
+name: rustfs
+base: core26
+version: '1.0.2'
+title: RustFS
+summary: S3-compatible, high-performance object storage
+description: |
+  RustFS is an open-source object storage server compatible with the
+  Amazon S3 API. It supports versioning, object lock, encryption,
+  lifecycle rules, replication, erasure coding and a web console, and can
+  migrate data from other S3-compatible services such as MinIO and Ceph.
+
+  **Getting started**
+
+  The service starts right after installation. It listens on
+  127.0.0.1:9000 (S3 API) and 127.0.0.1:9001 (web console) and stores data
+  in /var/snap/rustfs/common/data. Random credentials are generated at
+  installation:
+
+     sudo cat /var/snap/rustfs/common/credentials/access-key
+     sudo cat /var/snap/rustfs/common/credentials/secret-key
+
+  To open it to your network:
+
+     sudo snap set rustfs address=:9000 console-address=:9001
+
+  The web console is at http://127.0.0.1:9001/rustfs/console/.
+
+  **Storage on other drives**
+
+  To store data on disks mounted under /media or /mnt:
+
+     sudo snap connect rustfs:removable-media
+     sudo snap set rustfs volumes=/mnt/disk1/rustfs
+
+  For erasure coding across several disks, also run:
+
+     sudo snap connect rustfs:mount-observe
+     sudo snap set rustfs volumes='/mnt/disk{1...4}/rustfs'
+license: Apache-2.0
+grade: stable
+confinement: strict
+website: https://rustfs.com
+source-code: https://github.com/rustfs/rustfs
+issues: https://github.com/rustfs/rustfs/issues
+contact: https://github.com/sidalit/rustfs-snap/issues
+
+platforms:
+  amd64:
+  arm64:
+
+apps:
+  rustfs:
+    command: bin/rustfs
+    plugs:
+      - home
+      - network
+      - removable-media
+  daemon:
+    command: bin/rustfs-launch
+    daemon: simple
+    restart-condition: on-failure
+    plugs:
+      - network
+      - network-bind
+      - removable-media
+      # Multi-drive (erasure-coded) setups check that each drive is a separate mount.
+      - mount-observe
+
+parts:
+  # The web console is a separate project, embedded into the binary at build time.
+  console:
+    plugin: dump
+    source: https://github.com/rustfs/console/releases/download/v0.1.36/rustfs-console-v0.1.36.zip
+    source-checksum: sha256/0cfd00f539684c826cbd4b542404a9c564ec76ca5d2afc4434f29d86742d2200
+    organize:
+      '*': console/
+    prime:
+      - -*
+
+  rustfs:
+    after: [console]
+    plugin: rust
+    source: https://github.com/rustfs/rustfs.git
+    source-tag: '1.0.2'
+    rust-channel: '1.99.0'
+    rust-path:
+      - rustfs
+    build-packages:
+      - build-essential
+      - pkg-config
+      - libssl-dev
+      - lld
+      - protobuf-compiler
+      - flatbuffers-compiler
+    override-build: |
+      # The snap sandbox denies the openat2 system call with EPERM. Use RustFS's
+      # own fallback for kernels without openat2, which resolves each path
+      # component with O_NOFOLLOW, for EPERM as well as ENOSYS.
+      sed -i 's/Err(rustix::io::Errno::NOSYS) => open_linux_relative_legacy/Err(rustix::io::Errno::NOSYS | rustix::io::Errno::PERM) => open_linux_relative_legacy/' \
+        crates/ecstore/src/disk/os.rs
+      sed -i 's/Err(Errno::NOSYS) => return Err(LocalDiskPathValidationAtError::Unsupported)/Err(Errno::NOSYS | Errno::PERM) => return Err(LocalDiskPathValidationAtError::Unsupported)/' \
+        crates/ecstore/src/disk/local.rs
+      grep -q 'Errno::NOSYS | rustix::io::Errno::PERM' crates/ecstore/src/disk/os.rs
+      grep -q 'Errno::NOSYS | Errno::PERM' crates/ecstore/src/disk/local.rs
+
+      mkdir -p rustfs/static
+      cp -r "$CRAFT_STAGE/console/." rustfs/static/
+      craftctl default
+      install -Dm644 LICENSE "$CRAFT_PART_INSTALL/share/doc/rustfs/LICENSE"
+    # rustfs-cli is the same program as rustfs; upstream only ships rustfs.
+    prime:
+      - -bin/rustfs-cli
+
+  scripts:
+    plugin: dump
+    source: snap/local

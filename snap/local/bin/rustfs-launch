@@ -1,0 +1,35 @@
+#!/bin/sh
+# Start the service with the settings from `snap set rustfs ...`.
+set -eu
+
+RUSTFS_VOLUMES="$(snapctl get volumes)"
+RUSTFS_ADDRESS="$(snapctl get address)"
+RUSTFS_CONSOLE_ENABLE="$(snapctl get console-enable)"
+RUSTFS_CONSOLE_ADDRESS="$(snapctl get console-address)"
+RUSTFS_CHECK_UPDATE=false
+RUSTFS_ACCESS_KEY_FILE="$SNAP_COMMON/credentials/access-key"
+RUSTFS_SECRET_KEY_FILE="$SNAP_COMMON/credentials/secret-key"
+RUSTFS_OBS_LOG_DIRECTORY="$SNAP_COMMON/logs"
+export RUSTFS_VOLUMES RUSTFS_ADDRESS RUSTFS_CONSOLE_ENABLE RUSTFS_CONSOLE_ADDRESS RUSTFS_CHECK_UPDATE \
+  RUSTFS_ACCESS_KEY_FILE RUSTFS_SECRET_KEY_FILE RUSTFS_OBS_LOG_DIRECTORY
+
+server_domains="$(snapctl get server-domains)"
+if [ -n "$server_domains" ]; then
+  export RUSTFS_SERVER_DOMAINS="$server_domains"
+fi
+# Serve HTTPS once a certificate and key are placed in $SNAP_COMMON/tls.
+if [ -f "$SNAP_COMMON/tls/rustfs_cert.pem" ] && [ -f "$SNAP_COMMON/tls/rustfs_key.pem" ]; then
+  export RUSTFS_TLS_PATH="$SNAP_COMMON/tls"
+fi
+region="$(snapctl get region)"
+if [ -n "$region" ]; then
+  export RUSTFS_REGION="$region"
+fi
+
+# Create the default data folder; other volumes must already exist.
+mkdir -p "$SNAP_COMMON/data" "$SNAP_COMMON/logs" "$SNAP_COMMON/tls"
+
+# Object storage opens many files at once; upstream's service raises the limit too.
+ulimit -n "$(ulimit -Hn)" 2>/dev/null || true
+
+exec "$SNAP/bin/rustfs" server

@@ -1,0 +1,45 @@
+#!/bin/sh
+# Validate `snap set rustfs ...` and restart the service so changes apply.
+set -eu
+
+check_address() {
+  case "$2" in
+    *:*) ;;
+    *)
+      echo "$1 must be [host]:port, for example 127.0.0.1:9000 or :9000" >&2
+      exit 1
+      ;;
+  esac
+  port="${2##*:}"
+  case "$port" in
+    '' | *[!0-9]*)
+      echo "$1 must end with a port number" >&2
+      exit 1
+      ;;
+  esac
+  if [ "$port" -lt 1 ] || [ "$port" -gt 65535 ]; then
+    echo "$1 port must be between 1 and 65535" >&2
+    exit 1
+  fi
+}
+
+check_address address "$(snapctl get address)"
+check_address console-address "$(snapctl get console-address)"
+
+case "$(snapctl get console-enable)" in
+  true | false) ;;
+  *)
+    echo "console-enable must be true or false" >&2
+    exit 1
+    ;;
+esac
+
+if [ -z "$(snapctl get volumes)" ]; then
+  echo "volumes must not be empty" >&2
+  exit 1
+fi
+
+# Also restart a service that is down, so fixing a bad value brings it back.
+if snapctl services "$SNAP_INSTANCE_NAME.daemon" | grep -qwE 'enabled|active'; then
+  snapctl restart "$SNAP_INSTANCE_NAME.daemon"
+fi

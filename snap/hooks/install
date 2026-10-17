@@ -1,0 +1,17 @@
+#!/bin/sh
+# Default settings, and random credentials instead of upstream's well-known defaults.
+set -eu
+
+snapctl set volumes="$SNAP_COMMON/data" address=127.0.0.1:9000 \
+  console-enable=true console-address=127.0.0.1:9001
+
+credentials="$SNAP_COMMON/credentials"
+mkdir -p "$credentials"
+chmod 700 "$credentials"
+umask 077
+if [ ! -s "$credentials/access-key" ]; then
+  tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 20 > "$credentials/access-key"
+fi
+if [ ! -s "$credentials/secret-key" ]; then
+  tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 40 > "$credentials/secret-key"
+fi
