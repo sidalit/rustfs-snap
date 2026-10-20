@@ -1,6 +1,6 @@
 name: rustfs
 base: core26
-version: '1.0.2'
+adopt-info: rustfs
 title: RustFS
 summary: S3-compatible, high-performance object storage
 description: |
@@ -54,7 +54,9 @@ apps:
     plugs:
       - home
       - network
+      - network-bind
       - removable-media
+      - mount-observe
   daemon:
     command: bin/rustfs-launch
     daemon: simple
@@ -70,8 +72,8 @@ parts:
   # The web console is a separate project, embedded into the binary at build time.
   console:
     plugin: dump
-    source: https://github.com/rustfs/console/releases/download/v0.1.36/rustfs-console-v0.1.36.zip
-    source-checksum: sha256/0cfd00f539684c826cbd4b542404a9c564ec76ca5d2afc4434f29d86742d2200
+    source: https://github.com/rustfs/console/releases/download/v0.1.37/rustfs-console-v0.1.37.zip
+    source-checksum: sha256/e6ff2c7e7695de824ec4cda91d8611d1aba5d8462e6809592c92a50b23f5b9ab
     organize:
       '*': console/
     prime:
@@ -81,7 +83,8 @@ parts:
     after: [console]
     plugin: rust
     source: https://github.com/rustfs/rustfs.git
-    source-tag: '1.0.2'
+    # renovate: depName=rustfs/rustfs
+    source-tag: '1.0.3'
     rust-channel: '1.99.0'
     rust-path:
       - rustfs
@@ -92,6 +95,11 @@ parts:
       - lld
       - protobuf-compiler
       - flatbuffers-compiler
+      - python3
+    override-pull: |
+      craftctl default
+      version=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["workspace"]["package"]["version"])')
+      craftctl set version="$version"
     override-build: |
       # The snap sandbox denies the openat2 system call with EPERM. Use RustFS's
       # own fallback for kernels without openat2, which resolves each path

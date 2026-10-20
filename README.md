@@ -2,7 +2,7 @@
 
 [![rustfs](https://snapcraft.io/rustfs/badge.svg)](https://snapcraft.io/rustfs)
 
-Snap packaging for [RustFS](https://github.com/rustfs/rustfs), an open-source, S3-compatible, high-performance object storage server.
+Snap packaging for [RustFS](https://github.com/rustfs/rustfs), an open-source, S3-compatible object storage server.
 
 Unofficial build, not affiliated with or endorsed by the RustFS project.
 
@@ -17,30 +17,19 @@ snapcraft pack
 <a href="https://snapcraft.io/rustfs"><img alt="Get it from the Snap Store" src="https://snapcraft.io/en/dark/install.svg" width="180"></a>
 
 ```bash
-sudo snap install rustfs   # or a local build: ./rustfs_1.0.2_*.snap --dangerous
+sudo snap install rustfs
 ```
 
-The service starts right away and stores data in `/var/snap/rustfs/common/data`:
+The service starts right away. The S3 API listens on `127.0.0.1:9000`; open http://127.0.0.1:9001/rustfs/console/ for the web console.
 
-| What | Address |
-|---|---|
-| S3 API | `http://127.0.0.1:9000` |
-| Web console | `http://127.0.0.1:9001/rustfs/console/` |
-
-Random credentials are generated at installation, instead of upstream's well-known defaults:
+Random credentials are generated at installation:
 
 ```bash
 sudo cat /var/snap/rustfs/common/credentials/access-key
 sudo cat /var/snap/rustfs/common/credentials/secret-key
 ```
 
-Use them to log in to the console, or with any S3 client:
-
-```bash
-aws --endpoint-url http://127.0.0.1:9000 s3 mb s3://my-bucket
-```
-
-The `rustfs` command runs RustFS's own tools, for example `rustfs --version` or `sudo rustfs info`.
+Use them in the console or an S3 client. The `rustfs` command also exposes upstream tools, such as `rustfs --version`.
 
 ## Background service
 
@@ -55,40 +44,25 @@ sudo snap start --enable rustfs
 
 | Setting | Default | Description |
 |---|---|---|
-| `volumes` | `/var/snap/rustfs/common/data` | Data folders, separated by spaces. `{1...4}` expands to several drives |
-| `address` | `127.0.0.1:9000` | Address of the S3 API. Use `:9000` for all networks |
-| `console-enable` | `true` | Serve the web console |
-| `console-address` | `127.0.0.1:9001` | Address of the web console |
-| `server-domains` | not set | Domains for virtual-host-style requests, separated by commas |
+| `volumes` | `/var/snap/rustfs/common/data` | Space-separated data folders; `{1...4}` expands to several drives |
+| `address` | `127.0.0.1:9000` | S3 API address; `:9000` listens on all networks |
+| `console-enable` | `true` | Enable the web console |
+| `console-address` | `127.0.0.1:9001` | Web console address |
+| `server-domains` | not set | Comma-separated domains for virtual-host-style requests |
 | `region` | not set | Region reported to S3 clients |
 
-Changes apply right away. The service restarts by itself.
+Changes restart a running service. `snap unset rustfs <setting>` restores its default.
 
 ```bash
 sudo snap get rustfs
 sudo snap set rustfs address=:9000 console-address=:9001
-sudo snap unset rustfs region
 ```
 
-### Open the service to your network
+For HTTPS, place `rustfs_cert.pem` and `rustfs_key.pem` in `/var/snap/rustfs/common/tls`, then restart the service. To change credentials, replace the corresponding files under `/var/snap/rustfs/common/credentials` and restart.
 
-```bash
-sudo snap set rustfs address=:9000 console-address=:9001
-```
+## Data and backups
 
-Your firewall must allow the ports (for example `sudo ufw allow 9000,9001/tcp`).
-
-### HTTPS
-
-Place a certificate and its key in `/var/snap/rustfs/common/tls`, named `rustfs_cert.pem` and `rustfs_key.pem`, then restart the service. RustFS then serves the S3 API and console over HTTPS.
-
-### Credentials
-
-To change the credentials, replace the content of the two files in `/var/snap/rustfs/common/credentials`, then restart the service.
-
-## Storage on other drives
-
-The service can only use folders in `/var/snap/rustfs/common` and, with the `removable-media` connection, disks mounted under `/media` or `/mnt`:
+Data is stored in `/var/snap/rustfs/common/data`. To use a disk mounted under `/media` or `/mnt`:
 
 ```bash
 sudo snap connect rustfs:removable-media
@@ -96,48 +70,29 @@ sudo mkdir -p /mnt/disk1/rustfs
 sudo snap set rustfs volumes=/mnt/disk1/rustfs
 ```
 
-### Erasure coding across several disks
-
-With several volumes, RustFS checks that each one is a separate disk, which needs the `mount-observe` connection:
+For erasure coding, use separate mounted disks and connect `mount-observe`:
 
 ```bash
 sudo snap connect rustfs:mount-observe
 sudo snap set rustfs volumes='/mnt/disk{1...4}/rustfs'
 ```
 
-RustFS refuses several volumes on the same physical disk.
+Back up data and credentials before upgrading. `snap revert` restores the program, not its data or storage format. Keep cluster nodes on the same RustFS version.
 
 ## Known limitations
 
-### Folders outside /var/snap/rustfs/common, /media and /mnt
-
-The service cannot use other folders, such as `/data` or `/srv`. Mount the disks under `/mnt` instead.
-
-### Multiple drives need a manual connection
-
-`mount-observe` is not connected automatically. Without it, a multi-drive setup fails to start with `local endpoint cross-device mount validation failed: Permission denied`.
-
-### Upgrades and reverts
-
-Data lives in `/var/snap/rustfs/common`, which all revisions share, so `snap revert` restores the previous release but not the data. A newer release may update the on-disk format, which an older release might not read. Back up important data before major upgrades.
-
-For a cluster of several servers, refresh them together, as RustFS warns against mixing versions:
-
-```bash
-sudo snap refresh --hold rustfs   # on each server, then refresh them all at the same time
-```
-
-### openat2 messages in the kernel log
-
-The snap sandbox does not allow the `openat2` system call, so the snap makes RustFS use its fallback for kernels without it. The kernel log shows `seccomp` audit messages for `openat2` when the service starts. They are harmless.
-
-### Update check
-
-RustFS's update check is turned off, as updates come from the Snap Store.
+- Service storage is limited to snap data directories and connected drives under `/media` or `/mnt`; arbitrary paths such as `/srv` are unavailable.
+- Multiple drives require the manual `mount-observe` connection and separate disks.
+- The snap uses RustFS's legacy filesystem fallback when confinement blocks `openat2`; kernel audit messages may appear.
+- Updates use snapd; the daemon's upstream update check is disabled.
 
 ## Update to a new upstream release
 
-Change `version` and `source-tag` in `snap/snapcraft.yaml`, check the console release in the `console` part, then rebuild.
+Change `source-tag` in `snap/snapcraft.yaml`, check the console release and checksum, then rebuild. The version is taken from Cargo metadata.
+
+## Automation
+
+Builds, publishing, and dependency updates use [snap-automation](https://github.com/sidalit/snap-automation).
 
 ## License
 

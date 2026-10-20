@@ -2,6 +2,11 @@
 # Validate `snap set rustfs ...` and restart the service so changes apply.
 set -eu
 
+[ -n "$(snapctl get volumes)" ] || snapctl set volumes="$SNAP_COMMON/data"
+[ -n "$(snapctl get address)" ] || snapctl set address=127.0.0.1:9000
+[ -n "$(snapctl get console-enable)" ] || snapctl set console-enable=true
+[ -n "$(snapctl get console-address)" ] || snapctl set console-address=127.0.0.1:9001
+
 check_address() {
   case "$2" in
     *:*) ;;
@@ -34,12 +39,6 @@ case "$(snapctl get console-enable)" in
     ;;
 esac
 
-if [ -z "$(snapctl get volumes)" ]; then
-  echo "volumes must not be empty" >&2
-  exit 1
-fi
-
-# Also restart a service that is down, so fixing a bad value brings it back.
-if snapctl services "$SNAP_INSTANCE_NAME.daemon" | grep -qwE 'enabled|active'; then
+if snapctl services "$SNAP_INSTANCE_NAME.daemon" | awk 'NR > 1 {print $3}' | grep -qx active; then
   snapctl restart "$SNAP_INSTANCE_NAME.daemon"
 fi
