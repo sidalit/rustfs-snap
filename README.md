@@ -88,7 +88,7 @@ Back up data and credentials before upgrading. `snap revert` restores the progra
 
 ## Update to a new upstream release
 
-Change `source-tag` in `snap/snapcraft.yaml`, check the console release and checksum, then rebuild. The version is taken from Cargo metadata.
+Change `version` in `snap/snapcraft.yaml`, check the console release and checksum, then rebuild.
 
 ## Automation
 
