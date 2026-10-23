@@ -40,8 +40,12 @@ license: Apache-2.0
 grade: stable
 confinement: strict
 website: https://rustfs.com
-source-code: https://github.com/rustfs/rustfs
-issues: https://github.com/rustfs/rustfs/issues
+source-code:
+  - https://github.com/rustfs/rustfs
+  - https://github.com/sidalit/rustfs-snap
+issues:
+  - https://github.com/rustfs/rustfs/issues
+  - https://github.com/sidalit/rustfs-snap/issues
 contact: https://github.com/sidalit/rustfs-snap/issues
 
 platforms:
