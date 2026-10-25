@@ -2,6 +2,7 @@ name: rustfs
 base: core26
 version: '1.0.3'
 title: RustFS
+icon: snap/gui/rustfs.png
 summary: S3-compatible, high-performance object storage
 description: |
   RustFS is an open-source object storage server compatible with the
