@@ -92,6 +92,9 @@ parts:
     rust-channel: '1.99.0'
     rust-path:
       - rustfs
+    rust-cargo-parameters:
+      - --bin
+      - rustfs
     build-packages:
       - build-essential
       - pkg-config
@@ -115,9 +118,6 @@ parts:
       cp -r "$CRAFT_STAGE/console/." rustfs/static/
       craftctl default
       install -Dm644 LICENSE "$CRAFT_PART_INSTALL/share/doc/rustfs/LICENSE"
-    # rustfs-cli is the same program as rustfs; upstream only ships rustfs.
-    prime:
-      - -bin/rustfs-cli
 
   scripts:
     plugin: dump
