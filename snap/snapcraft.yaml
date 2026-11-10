@@ -1,6 +1,6 @@
 name: rustfs
 base: core26
-version: '1.0.4'
+version: '1.0.5'
 title: RustFS
 icon: snap/gui/rustfs.png
 summary: S3-compatible, high-performance object storage
