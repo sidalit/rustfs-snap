@@ -89,7 +89,7 @@ parts:
     plugin: rust
     source: https://github.com/rustfs/rustfs.git
     source-tag: $SNAPCRAFT_PROJECT_VERSION
-    rust-channel: '1.99.0'
+    rust-channel: stable
     rust-path:
       - rustfs
     rust-cargo-parameters:
